@@ -46,10 +46,10 @@ export default async function handler(
           thread_ts: ts, // スレッドで返信
           text: completion.choices[0].message.content || '申し訳ありません。応答を生成できませんでした。',
         });
-      } catch (error) {
+      } catch (error: any) {
         let errorMessage = '申し訳ありません。エラーが発生しました。';
         
-        if (error.code === 'insufficient_quota') {
+        if (error?.code === 'insufficient_quota') {
           errorMessage = '申し訳ありません。現在APIの利用制限に達しています。しばらく時間をおいてから再度お試しください。';
         }
 
@@ -62,5 +62,6 @@ export default async function handler(
     }
   } catch (error) {
     console.error('Error:', error);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 } 
