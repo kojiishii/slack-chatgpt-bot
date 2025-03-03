@@ -76,7 +76,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         return res.status(200).json({ ok: true });
       } catch (error) {
-        await logDebug({ type: 'error', error: error.message });
+        const errorMessage = error instanceof Error 
+          ? error.message 
+          : 'Unknown error';
+
+        await logDebug({ type: 'error', error: errorMessage });
         return res.status(500).json({ error: 'Internal server error' });
       }
     }
@@ -85,7 +89,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ ok: true });
 
   } catch (error) {
-    await logDebug({ type: 'top_level_error', error: error.message });
+    const errorMessage = error instanceof Error 
+      ? error.message 
+      : 'Unknown error';
+
+    await logDebug({ type: 'top_level_error', error: errorMessage });
     return res.status(500).json({ error: 'Internal server error' });
   }
 } 
