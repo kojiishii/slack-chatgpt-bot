@@ -58,12 +58,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const response = await getChatGPTResponse(event.text);
         await logDebug({ type: 'chatgpt_response', input: event.text, response });
 
-        await sendSlackMessage(event.channel, response);
-        await logDebug({ type: 'slack_message_sent', channel: event.channel });
+        try {
+          await sendSlackMessage(event.channel, response);
+          await logDebug({ type: 'slack_message_sent', channel: event.channel });
+        } catch (slackError) {
+          await logDebug({ 
+            type: 'slack_error', 
+            error: slackError.message,
+            channel: event.channel,
+            response: response
+          });
+        }
 
         return res.status(200).json({ ok: true });
       } catch (error) {
-        await logDebug({ type: 'error', error });
+        await logDebug({ type: 'error', error: error.message });
         return res.status(500).json({ error: 'Internal server error' });
       }
     }
@@ -72,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ ok: true });
 
   } catch (error) {
-    await logDebug({ type: 'top_level_error', error });
+    await logDebug({ type: 'top_level_error', error: error.message });
     return res.status(500).json({ error: 'Internal server error' });
   }
 } 
