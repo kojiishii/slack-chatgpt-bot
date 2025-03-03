@@ -62,9 +62,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await sendSlackMessage(event.channel, response);
           await logDebug({ type: 'slack_message_sent', channel: event.channel });
         } catch (slackError) {
+          const errorMessage = slackError instanceof Error 
+            ? slackError.message 
+            : 'Unknown Slack API error';
+
           await logDebug({ 
             type: 'slack_error', 
-            error: slackError.message,
+            error: errorMessage,
             channel: event.channel,
             response: response
           });
