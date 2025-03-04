@@ -50,38 +50,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json({ challenge: payload.challenge });
     }
 
-    if (payload.type === 'event_callback' && payload.event?.type === 'app_mention') {
-      await logDebug({ type: 'app_mention_received', event: payload.event });
-      const { event } = payload;
-      
-      try {
-        const response = await getChatGPTResponse(event.text);
-        await logDebug({ type: 'chatgpt_response', input: event.text, response });
-
+    if (payload.type === 'event_callback') {
+      if (payload.event?.type === 'app_mention') {
+        await logDebug({ type: 'app_mention_received', event: payload.event });
+        const { event } = payload;
+        
         try {
-          await sendSlackMessage(event.channel, response);
-          await logDebug({ type: 'slack_message_sent', channel: event.channel });
-        } catch (slackError) {
-          const errorMessage = slackError instanceof Error 
-            ? slackError.message 
-            : 'Unknown Slack API error';
+          const response = await getChatGPTResponse(event.text);
+          await logDebug({ type: 'chatgpt_response', input: event.text, response });
 
-          await logDebug({ 
-            type: 'slack_error', 
-            error: errorMessage,
-            channel: event.channel,
-            response: response
-          });
+          try {
+            await sendSlackMessage(event.channel, response);
+            await logDebug({ type: 'slack_message_sent', channel: event.channel });
+          } catch (slackError) {
+            const errorMessage = slackError instanceof Error 
+              ? slackError.message 
+              : 'Unknown Slack API error';
+
+            await logDebug({ 
+              type: 'slack_error', 
+              error: errorMessage,
+              channel: event.channel,
+              response: response
+            });
+          }
+
+          return res.status(200).json({ ok: true });
+        } catch (error) {
+          const errorMessage = error instanceof Error 
+            ? error.message 
+            : 'Unknown error';
+
+          await logDebug({ type: 'error', error: errorMessage });
+          return res.status(500).json({ error: 'Internal server error' });
         }
-
+      } else if (payload.event?.type === 'message' && payload.event?.channel_type === 'channel') {
+        const { event } = payload;
+        const response = await getChatGPTResponse(event.text);
+        await sendSlackMessage(event.channel, response);
         return res.status(200).json({ ok: true });
-      } catch (error) {
-        const errorMessage = error instanceof Error 
-          ? error.message 
-          : 'Unknown error';
-
-        await logDebug({ type: 'error', error: errorMessage });
-        return res.status(500).json({ error: 'Internal server error' });
       }
     }
 
