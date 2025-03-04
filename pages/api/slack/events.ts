@@ -22,7 +22,13 @@ type SlackEventPayload = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // リクエストヘッダーも含めて詳細にログ
+  // 認証トークンの確認
+  await logDebug({
+    type: 'token_check',
+    token_exists: !!process.env.SLACK_BOT_TOKEN,
+    token_length: process.env.SLACK_BOT_TOKEN?.length
+  });
+
   await logDebug({
     type: 'incoming_request',
     method: req.method,
@@ -31,8 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       'x-slack-signature': req.headers['x-slack-signature'],
       'x-slack-request-timestamp': req.headers['x-slack-request-timestamp']
     },
-    body: req.body,
-    timestamp: new Date()
+    body: req.body
   });
 
   const payload = req.body;
