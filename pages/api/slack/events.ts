@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { logDebug } from './debug';
+import OpenAI from 'openai';
 
 const DEBUG = true;
 
@@ -25,6 +26,10 @@ type SlackEventPayload = {
 // 処理済みのイベントIDを保持する配列（最大100件）
 const processedEventIds: string[] = [];
 const MAX_PROCESSED_EVENTS = 100;
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -76,19 +81,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         try {
-          if (!process.env.SLACK_BOT_TOKEN) {
-            throw new Error('SLACK_BOT_TOKEN is not set');
+          if (!process.env.SLACK_BOT_TOKEN || !process.env.OPENAI_API_KEY) {
+            throw new Error('Required environment variables are not set');
           }
 
-          const response = `テストメッセージです。あなたのメッセージ: ${event.text}`;
-          
-          await logDebug({
-            type: 'sending_message',
-            eventId,
-            text: response,
-            channel: event.channel
+          // ChatGPTに質問を送信
+          const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: [
+              {
+                role: "system",
+                content: "あなたは親切なAIアシスタントです。ユーザーからの質問に日本語で答えてください。"
+              },
+              {
+                role: "user",
+                content: event.text
+              }
+            ],
           });
 
+          const response = completion.choices[0]?.message?.content || 'すみません、応答を生成できませんでした。';
+          
+          await logDebug({
+            type: 'gpt_response',
+            eventId,
+            question: event.text,
+            response: response
+          });
+
+          // Slackにメッセージを送信
           const result = await fetch('https://slack.com/api/chat.postMessage', {
             method: 'POST',
             headers: {
