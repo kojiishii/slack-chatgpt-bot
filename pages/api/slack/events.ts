@@ -27,7 +27,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     if (payload.type === 'event_callback' && payload.event?.type === 'app_mention') {
       const event = payload.event;
-      const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+      
+      // メンションとタイムスタンプ、名前を除去
+      const text = event.text
+        .replace(/<@[A-Z0-9]+>/g, '')  // メンションを削除
+        .replace(/\[\d{2}:\d{2}\].*?\n+/g, '')  // タイムスタンプと名前の行を削除
+        .trim();  // 余分な空白を削除
 
       await logDebug({
         type: 'test_response',
