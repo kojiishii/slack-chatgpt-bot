@@ -20,68 +20,44 @@ type SlackEventPayload = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (DEBUG) {
-    console.log('Request received:', {
-      method: req.method,
-      body: req.body,
-      headers: req.headers
+  // 最初にリクエストをログ出力
+  console.log('=== START REQUEST ===');
+  console.log('Request received:', {
+    method: req.method,
+    headers: req.headers,
+    body: JSON.stringify(req.body, null, 2)
+  });
+
+  const payload = req.body;
+
+  // ペイロードの種類をログ出力
+  console.log('Payload type:', payload.type);
+
+  if (payload.type === 'url_verification') {
+    if (payload.challenge) {
+      return res.status(200).json({ challenge: payload.challenge });
+    }
+  }
+
+  if (payload.type === 'event_callback') {
+    console.log('Event received:', {
+      type: payload.event?.type,
+      channel_type: payload.event?.channel_type,
+      text: payload.event?.text,
+      user: payload.event?.user
     });
+
+    // イベント処理の前後でログ
+    try {
+      const response = await getChatGPTResponse(payload.event.text);
+      console.log('ChatGPT response:', response);
+      await sendSlackMessage(payload.event.channel, response);
+      console.log('Message sent to Slack');
+    } catch (error) {
+      console.error('Error processing event:', error);
+    }
   }
 
-  try {
-    if (req.method !== 'POST') {
-      return res.status(405).json({ error: 'Method not allowed' });
-    }
-
-    const payload = req.body;
-
-    if (payload.type === 'url_verification') {
-      if (payload.challenge) {
-        return res.status(200).json({ challenge: payload.challenge });
-      }
-    }
-
-    if (payload.type === 'event_callback') {
-      const { event } = payload;
-      
-      // メッセージイベントの処理
-      if (event.type === 'message') {
-        console.log('Message event received:', event);
-        
-        if (event.channel_type === 'channel') {
-          console.log('Channel message confirmed');
-          
-          if (!event.subtype) {
-            console.log('Not a system message');
-            
-            if (!event.text.includes(`<@${payload.authorizations[0].user_id}>`)) {
-              console.log('Not a mention');
-              const response = await getChatGPTResponse(event.text);
-              await sendSlackMessage(event.channel, response);
-              return res.status(200).json({ ok: true });
-            }
-          }
-        }
-      }
-      
-      // メンションイベントの処理
-      if (event.type === 'app_mention') {
-        console.log('Received mention:', event);
-        
-        const response = await getChatGPTResponse(event.text);
-        await sendSlackMessage(event.channel, response);
-        return res.status(200).json({ ok: true });
-      }
-    }
-
-    return res.status(200).json({ ok: true });
-
-  } catch (error) {
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : 'Unknown error';
-
-    console.error('Top level error:', errorMessage);
-    return res.status(500).json({ error: 'Internal server error' });
-  }
+  console.log('=== END REQUEST ===');
+  return res.status(200).json({ ok: true });
 } 
