@@ -49,11 +49,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         text: payload.event?.text
       });
     }
-  } catch (error) {
+  } catch (err) {
+    const error = err as Error;  // Type assertion
     await logDebug({
       type: 'error',
-      error: error.message,
-      stack: error.stack
+      message: error.message || 'Unknown error',
+      stack: error.stack || 'No stack trace'
     });
   }
 } 
