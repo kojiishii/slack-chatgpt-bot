@@ -30,18 +30,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (payload.type === 'event_callback') {
       const event = payload.event;
 
+      // すべてのイベントの詳細をログ出力
       await logDebug({
-        type: 'raw_event',
-        event: event
+        type: 'detailed_event',
+        event: event,
+        payload: payload
       });
 
-      // メッセージイベントかつ、ボット自身のメッセージでない場合
-      if (
-        event.type === 'message' && 
-        !event.bot_id &&      // ボットのメッセージを除外
-        !event.subtype &&     // システムメッセージを除外
-        event.user !== 'U08FS7RD4NQ'  // ボットのユーザーIDを除外
-      ) {
+      // メッセージイベントの条件を単純化
+      if (event.type === 'message' && !event.bot_id) {
         await logDebug({
           type: 'processing_message',
           text: event.text,
