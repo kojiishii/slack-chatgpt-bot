@@ -22,65 +22,49 @@ type SlackEventPayload = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // まず応答を返す
   res.status(200).json({ ok: true });
 
   try {
     const payload = req.body;
     
-    // イベントコールバックの場合のみ処理
-    if (payload.type === 'event_callback') {
+    if (payload.type === 'event_callback' && payload.event?.type === 'app_mention') {
       const event = payload.event;
+      const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+
+      await logDebug({
+        type: 'test_response',
+        text: text,
+        channel: event.channel
+      });
+
+      // テスト用の固定応答
+      const response = `テストメッセージです。あなたのメッセージ: ${text}`;
       
-      // app_mentionイベントの処理
-      if (event.type === 'app_mention') {
-        await logDebug({
-          type: 'processing_mention',
-          raw_text: event.text,
-          user: event.user,
-          channel: event.channel
-        });
+      // Slackにメッセージを送信
+      const result = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`
+        },
+        body: JSON.stringify({
+          channel: event.channel,
+          text: response
+        })
+      });
 
-        // メンションを削除してテキストを抽出
-        const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
-
-        await logDebug({
-          type: 'extracted_text',
-          text: text
-        });
-
-        try {
-          // ChatGPTからの応答を取得
-          const response = await getChatGPTResponse(text);
-          await logDebug({
-            type: 'chatgpt_response',
-            prompt: text,
-            response: response
-          });
-
-          // Slackにメッセージを送信
-          await sendSlackMessage(event.channel, response);
-          await logDebug({
-            type: 'slack_message_sent',
-            channel: event.channel,
-            text: response
-          });
-        } catch (err) {
-          const error = err as Error;
-          await logDebug({
-            type: 'error',
-            message: error.message,
-            stack: error.stack
-          });
-        }
-      }
+      await logDebug({
+        type: 'slack_response',
+        status: result.status,
+        response: await result.json()
+      });
     }
   } catch (err) {
     const error = err as Error;
     await logDebug({
       type: 'error',
-      message: error.message || 'Unknown error',
-      stack: error.stack || 'No stack trace'
+      message: error.message,
+      stack: error.stack
     });
   }
 } 
