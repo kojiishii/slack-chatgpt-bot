@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { getChatGPTResponse } from '../../../utils/openai';
 import { sendSlackMessage } from '../../../utils/slack';
 
+const DEBUG = true;
+
 type SlackEvent = {
   type: string;
   text?: string;
@@ -18,6 +20,14 @@ type SlackEventPayload = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (DEBUG) {
+    console.log('Request received:', {
+      method: req.method,
+      body: req.body,
+      headers: req.headers
+    });
+  }
+
   try {
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' });
@@ -35,23 +45,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const { event } = payload;
       
       // メッセージイベントの処理
-      if (event.type === 'message' && 
-          event.channel_type === 'channel' && 
-          !event.subtype && // botやシステムメッセージを除外
-          !event.text.includes(`<@${payload.authorizations[0].user_id}>`) // メンションを除外
-      ) {
-        console.log('Message event:', {
-          type: 'message_received',
-          event_type: event.type,
-          channel_type: event.channel_type,
-          subtype: event.subtype,
-          text: event.text,
-          user_id: payload.authorizations[0]?.user_id
-        });
+      if (event.type === 'message') {
+        console.log('Message event received:', event);
         
-        const response = await getChatGPTResponse(event.text);
-        await sendSlackMessage(event.channel, response);
-        return res.status(200).json({ ok: true });
+        if (event.channel_type === 'channel') {
+          console.log('Channel message confirmed');
+          
+          if (!event.subtype) {
+            console.log('Not a system message');
+            
+            if (!event.text.includes(`<@${payload.authorizations[0].user_id}>`)) {
+              console.log('Not a mention');
+              const response = await getChatGPTResponse(event.text);
+              await sendSlackMessage(event.channel, response);
+              return res.status(200).json({ ok: true });
+            }
+          }
+        }
       }
       
       // メンションイベントの処理
