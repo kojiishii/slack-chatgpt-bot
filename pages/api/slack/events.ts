@@ -45,14 +45,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         try {
-          // テスト用の固定応答
+          // トークンの存在確認
+          if (!process.env.SLACK_BOT_TOKEN) {
+            throw new Error('SLACK_BOT_TOKEN is not set');
+          }
+
           const response = `テストメッセージです。あなたのメッセージ: ${event.text}`;
           
-          // Slackにメッセージを送信
           await logDebug({
             type: 'sending_message',
             text: response,
-            channel: event.channel
+            channel: event.channel,
+            token_exists: !!process.env.SLACK_BOT_TOKEN
           });
 
           const result = await fetch('https://slack.com/api/chat.postMessage', {
@@ -67,14 +71,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             })
           });
 
-          const slackResponse = await result.json();
+          // レスポンスの詳細をログ出力
+          const responseText = await result.text();
           await logDebug({
             type: 'slack_api_response',
             status: result.status,
-            ok: slackResponse.ok,
-            error: slackResponse.error,
-            response: slackResponse
+            headers: Object.fromEntries(result.headers),
+            response: responseText
           });
+
+          const slackResponse = JSON.parse(responseText);
+          if (!slackResponse.ok) {
+            throw new Error(`Slack API error: ${slackResponse.error}`);
+          }
         } catch (error) {
           const sendError = error as Error;
           await logDebug({
