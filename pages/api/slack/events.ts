@@ -22,35 +22,50 @@ type SlackEventPayload = {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // すべてのリクエストに対して即座に200を返す
+  // まず応答を返す
   res.status(200).json({ ok: true });
 
-  // 以降は非同期でログを記録
   try {
-    await logDebug({
-      type: 'raw_request',
-      timestamp: new Date(),
-      method: req.method,
-      headers: {
-        'content-type': req.headers['content-type'],
-        'x-slack-signature': req.headers['x-slack-signature'],
-        'x-slack-request-timestamp': req.headers['x-slack-request-timestamp']
-      },
-      body: JSON.stringify(req.body, null, 2)
-    });
-
-    // イベントの種類を確認
     const payload = req.body;
+    
+    // イベントコールバックの場合のみ処理
     if (payload.type === 'event_callback') {
-      await logDebug({
-        type: 'event_details',
-        event_type: payload.event?.type,
-        channel_type: payload.event?.channel_type,
-        text: payload.event?.text
-      });
+      const event = payload.event;
+      
+      // app_mentionイベントの処理
+      if (event.type === 'app_mention') {
+        await logDebug({
+          type: 'processing_mention',
+          text: event.text,
+          user: event.user,
+          channel: event.channel
+        });
+
+        // メンションを除去してテキストを取得
+        const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+        
+        try {
+          const response = await getChatGPTResponse(text);
+          await sendSlackMessage(event.channel, response);
+          
+          await logDebug({
+            type: 'response_sent',
+            original_text: text,
+            response: response,
+            channel: event.channel
+          });
+        } catch (err) {
+          const error = err as Error;
+          await logDebug({
+            type: 'response_error',
+            message: error.message,
+            original_text: text
+          });
+        }
+      }
     }
   } catch (err) {
-    const error = err as Error;  // Type assertion
+    const error = err as Error;
     await logDebug({
       type: 'error',
       message: error.message || 'Unknown error',
