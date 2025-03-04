@@ -18,22 +18,21 @@ type SlackEventPayload = {
   challenge?: string;
   type: string;
   event?: SlackEvent;
+  team_id?: string;
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // 最初にリクエストをログ出力
-  console.log('=== START REQUEST ===');
-  console.log('Request received:', {
-    method: req.method,
-    headers: req.headers,
-    body: JSON.stringify(req.body, null, 2)
-  });
-
-  // イベントをデバッグログに記録
+  // リクエストヘッダーも含めて詳細にログ
   await logDebug({
     type: 'incoming_request',
     method: req.method,
-    body: req.body
+    headers: {
+      'content-type': req.headers['content-type'],
+      'x-slack-signature': req.headers['x-slack-signature'],
+      'x-slack-request-timestamp': req.headers['x-slack-request-timestamp']
+    },
+    body: req.body,
+    timestamp: new Date()
   });
 
   const payload = req.body;
@@ -54,20 +53,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await logDebug({
       type: 'event_callback',
       event: payload.event,
+      team: payload.team_id,
       timestamp: new Date()
     });
-    console.log('Event received:', {
-      type: payload.event?.type,
-      channel_type: payload.event?.channel_type,
-      text: payload.event?.text,
-      user: payload.event?.user
-    });
+
+    const { event } = payload;
+    if (event.type === 'message') {
+      await logDebug({
+        type: 'message_event',
+        text: event.text,
+        channel: event.channel,
+        user: event.user
+      });
+    }
 
     // イベント処理の前後でログ
     try {
-      const response = await getChatGPTResponse(payload.event.text);
+      const response = await getChatGPTResponse(event.text);
       console.log('ChatGPT response:', response);
-      await sendSlackMessage(payload.event.channel, response);
+      await sendSlackMessage(event.channel, response);
       console.log('Message sent to Slack');
     } catch (error) {
       console.error('Error processing event:', error);
