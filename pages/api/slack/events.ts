@@ -1,6 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getChatGPTResponse } from '../../utils/chatgpt';
-import { sendSlackMessage } from '../../utils/slack';
 import { logDebug } from './debug';
 
 const DEBUG = true;
