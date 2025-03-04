@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getChatGPTResponse } from '../../../utils/openai';
 import { sendSlackMessage } from '../../../utils/slack';
-import { logDebug } from './debug';
 
 type SlackEvent = {
   type: string;
@@ -18,37 +17,18 @@ type SlackEventPayload = {
   event?: SlackEvent;
 }
 
-async function logDebug(data: any) {
-  try {
-    await fetch('https://slack-chatgpt-bot-beta.vercel.app/api/debug', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  } catch (error) {
-    console.error('Debug log error:', error);
-  }
-}
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    await logDebug({
-      type: 'request_received',
-      headers: req.headers,
-      method: req.method,
-      body: req.body
-    });
-
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' });
     }
 
     const payload = req.body;
-    await logDebug({ type: 'payload_received', payload });
 
     if (payload.type === 'url_verification') {
-      await logDebug({ type: 'challenge_received', challenge: payload.challenge });
-      return res.status(200).json({ challenge: payload.challenge });
+      if (payload.challenge) {
+        return res.status(200).json({ challenge: payload.challenge });
+      }
     }
 
     if (payload.type === 'event_callback') {
@@ -60,7 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           !event.subtype && // botやシステムメッセージを除外
           !event.text.includes(`<@${payload.authorizations[0].user_id}>`) // メンションを除外
       ) {
-        await logDebug({
+        console.log('Message event:', {
           type: 'message_received',
           event_type: event.type,
           channel_type: event.channel_type,
@@ -84,7 +64,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    await logDebug({ type: 'unhandled_event', eventType: payload.type });
     return res.status(200).json({ ok: true });
 
   } catch (error) {
@@ -92,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ? error.message 
       : 'Unknown error';
 
-    await logDebug({ type: 'top_level_error', error: errorMessage });
+    console.error('Top level error:', errorMessage);
     return res.status(500).json({ error: 'Internal server error' });
   }
 } 
