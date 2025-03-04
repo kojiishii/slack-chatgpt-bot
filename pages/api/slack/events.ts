@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getChatGPTResponse } from '../../../utils/openai';
 import { sendSlackMessage } from '../../../utils/slack';
+import { logDebug } from './debug';
 
 type SlackEvent = {
   type: string;
@@ -59,7 +60,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           !event.subtype && // botやシステムメッセージを除外
           !event.text.includes(`<@${payload.authorizations[0].user_id}>`) // メンションを除外
       ) {
-        console.log('Received channel message:', event);
+        await logDebug({
+          type: 'message_received',
+          event_type: event.type,
+          channel_type: event.channel_type,
+          subtype: event.subtype,
+          text: event.text,
+          user_id: payload.authorizations[0]?.user_id
+        });
         
         const response = await getChatGPTResponse(event.text);
         await sendSlackMessage(event.channel, response);
