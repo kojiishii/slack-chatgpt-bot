@@ -31,10 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   // イベントをデバッグログに記録
   await logDebug({
-    type: 'slack_event',
+    type: 'incoming_request',
     method: req.method,
-    body: req.body,
-    timestamp: new Date()
+    body: req.body
   });
 
   const payload = req.body;
@@ -42,10 +41,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // ペイロードの種類をログ出力
   console.log('Payload type:', payload.type);
 
+  // チャレンジレスポンスの処理
   if (payload.type === 'url_verification') {
-    if (payload.challenge) {
-      return res.status(200).json({ challenge: payload.challenge });
-    }
+    await logDebug({
+      type: 'url_verification',
+      challenge: payload.challenge
+    });
+    return res.status(200).json({ challenge: payload.challenge });
   }
 
   if (payload.type === 'event_callback') {
