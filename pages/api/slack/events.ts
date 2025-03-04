@@ -36,21 +36,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (event.type === 'app_mention') {
         await logDebug({
           type: 'processing_mention',
-          text: event.text,
+          raw_text: event.text,
           user: event.user,
           channel: event.channel
         });
 
-        // メンションを除去してテキストを取得
-        const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+        // テキストの抽出と整形
+        let text = event.text;
         
+        // タイムスタンプと名前の行を削除
+        text = text.replace(/^\[\d{2}:\d{2}\].*\n+/m, '');
+        
+        // メンションを削除
+        text = text.replace(/<@[A-Z0-9]+>/g, '').trim();
+
+        await logDebug({
+          type: 'extracted_text',
+          text: text
+        });
+
         try {
           const response = await getChatGPTResponse(text);
           await sendSlackMessage(event.channel, response);
           
           await logDebug({
             type: 'response_sent',
-            original_text: text,
+            text: text,
             response: response,
             channel: event.channel
           });
@@ -59,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await logDebug({
             type: 'response_error',
             message: error.message,
-            original_text: text
+            text: text
           });
         }
       }
