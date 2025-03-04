@@ -54,10 +54,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })
         });
 
+        // Slackのレスポンスを詳細にログ出力
+        const slackResponse = await result.json();
         await logDebug({
-          type: 'slack_response',
+          type: 'slack_api_response',
           status: result.status,
-          response: await result.json()
+          ok: slackResponse.ok,
+          error: slackResponse.error,
+          response: slackResponse
         });
       }
     }
