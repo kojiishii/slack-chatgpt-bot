@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getChatGPTResponse } from '../../../utils/openai';
 import { sendSlackMessage } from '../../../utils/slack';
+import { logDebug } from './debug';
 
 const DEBUG = true;
 
@@ -28,6 +29,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     body: JSON.stringify(req.body, null, 2)
   });
 
+  // イベントをデバッグログに記録
+  await logDebug({
+    type: 'slack_event',
+    method: req.method,
+    body: req.body,
+    timestamp: new Date()
+  });
+
   const payload = req.body;
 
   // ペイロードの種類をログ出力
@@ -40,6 +49,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   if (payload.type === 'event_callback') {
+    await logDebug({
+      type: 'event_callback',
+      event: payload.event,
+      timestamp: new Date()
+    });
     console.log('Event received:', {
       type: payload.event?.type,
       channel_type: payload.event?.channel_type,
