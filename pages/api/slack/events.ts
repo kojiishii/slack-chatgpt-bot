@@ -30,18 +30,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (payload.type === 'event_callback') {
       const event = payload.event;
 
-      await logDebug({
-        type: 'detailed_event',
-        event: event,
-        payload: payload
-      });
-
       if (event.type === 'message' && !event.bot_id) {
+        // 現在のタイムスタンプと比較（3秒以内のメッセージは無視）
+        const eventTime = parseFloat(event.ts);
+        const now = Date.now() / 1000;
+        
+        if (now - eventTime > 3) {
+          await logDebug({
+            type: 'old_message_skipped',
+            eventTime,
+            now,
+            diff: now - eventTime
+          });
+          return;
+        }
+
         await logDebug({
           type: 'processing_message',
           text: event.text,
           user: event.user,
-          channel: event.channel
+          channel: event.channel,
+          eventTime,
+          now
         });
 
         try {
