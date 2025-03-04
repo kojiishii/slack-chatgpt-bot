@@ -30,11 +30,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (payload.type === 'event_callback') {
       const event = payload.event;
 
+      await logDebug({
+        type: 'raw_event',
+        event: event
+      });
+
       // メッセージイベントかつ、ボット自身のメッセージでない場合
-      if (event.type === 'message' && !event.bot_id && !event.subtype) {
+      if (
+        event.type === 'message' && 
+        !event.bot_id &&      // ボットのメッセージを除外
+        !event.subtype &&     // システムメッセージを除外
+        event.user !== 'U08FS7RD4NQ'  // ボットのユーザーIDを除外
+      ) {
         await logDebug({
-          type: 'test_response',
+          type: 'processing_message',
           text: event.text,
+          user: event.user,
           channel: event.channel
         });
 
@@ -54,7 +65,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           })
         });
 
-        // Slackのレスポンスを詳細にログ出力
         const slackResponse = await result.json();
         await logDebug({
           type: 'slack_api_response',
