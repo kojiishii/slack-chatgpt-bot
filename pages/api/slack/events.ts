@@ -30,14 +30,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (payload.type === 'event_callback') {
       const event = payload.event;
 
-      // すべてのイベントの詳細をログ出力
       await logDebug({
         type: 'detailed_event',
         event: event,
         payload: payload
       });
 
-      // メッセージイベントの条件を単純化
       if (event.type === 'message' && !event.bot_id) {
         await logDebug({
           type: 'processing_message',
@@ -46,30 +44,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           channel: event.channel
         });
 
-        // テスト用の固定応答
-        const response = `テストメッセージです。あなたのメッセージ: ${event.text}`;
-        
-        // Slackにメッセージを送信
-        const result = await fetch('https://slack.com/api/chat.postMessage', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`
-          },
-          body: JSON.stringify({
-            channel: event.channel,
-            text: response
-          })
-        });
+        try {
+          // テスト用の固定応答
+          const response = `テストメッセージです。あなたのメッセージ: ${event.text}`;
+          
+          // Slackにメッセージを送信
+          await logDebug({
+            type: 'sending_message',
+            text: response,
+            channel: event.channel
+          });
 
-        const slackResponse = await result.json();
-        await logDebug({
-          type: 'slack_api_response',
-          status: result.status,
-          ok: slackResponse.ok,
-          error: slackResponse.error,
-          response: slackResponse
-        });
+          const result = await fetch('https://slack.com/api/chat.postMessage', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${process.env.SLACK_BOT_TOKEN}`
+            },
+            body: JSON.stringify({
+              channel: event.channel,
+              text: response
+            })
+          });
+
+          const slackResponse = await result.json();
+          await logDebug({
+            type: 'slack_api_response',
+            status: result.status,
+            ok: slackResponse.ok,
+            error: slackResponse.error,
+            response: slackResponse
+          });
+        } catch (sendError) {
+          await logDebug({
+            type: 'send_error',
+            error: sendError.message,
+            stack: sendError.stack
+          });
+        }
       }
     }
   } catch (err) {
