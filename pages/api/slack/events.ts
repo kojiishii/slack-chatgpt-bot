@@ -75,7 +75,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             error: slackResponse.error,
             response: slackResponse
           });
-        } catch (sendError) {
+        } catch (error) {
+          const sendError = error as Error;
           await logDebug({
             type: 'send_error',
             error: sendError.message,
