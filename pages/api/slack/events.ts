@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { getChatGPTResponse } from '../../../utils/openai';
-import { sendSlackMessage } from '../../../utils/slack';
+import { getChatGPTResponse } from '../../utils/chatgpt';
+import { sendSlackMessage } from '../../utils/slack';
 import { logDebug } from './debug';
 
 const DEBUG = true;
@@ -41,14 +41,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           channel: event.channel
         });
 
-        // テキストの抽出と整形
-        let text = event.text;
-        
-        // タイムスタンプと名前の行を削除
-        text = text.replace(/^\[\d{2}:\d{2}\].*\n+/m, '');
-        
-        // メンションを削除
-        text = text.replace(/<@[A-Z0-9]+>/g, '').trim();
+        // メンションを削除してテキストを抽出
+        const text = event.text.replace(/<@[A-Z0-9]+>/g, '').trim();
 
         await logDebug({
           type: 'extracted_text',
@@ -56,21 +50,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         try {
+          // ChatGPTからの応答を取得
           const response = await getChatGPTResponse(text);
-          await sendSlackMessage(event.channel, response);
-          
           await logDebug({
-            type: 'response_sent',
-            text: text,
-            response: response,
-            channel: event.channel
+            type: 'chatgpt_response',
+            prompt: text,
+            response: response
+          });
+
+          // Slackにメッセージを送信
+          await sendSlackMessage(event.channel, response);
+          await logDebug({
+            type: 'slack_message_sent',
+            channel: event.channel,
+            text: response
           });
         } catch (err) {
           const error = err as Error;
           await logDebug({
-            type: 'response_error',
+            type: 'error',
             message: error.message,
-            text: text
+            stack: error.stack
           });
         }
       }
